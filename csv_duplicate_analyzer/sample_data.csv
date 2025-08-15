@@ -1,0 +1,8 @@
+customer_id,order_date,product,quantity,price,status,customer_id,notes
+101,2024-01-15,Widget A,2,19.99,completed,101,First order
+101,2024-01-15,Widget B,1,29.99,completed,101,First order
+101,2024-01-16,Widget A,2,19.99,pending,101,Duplicate order
+102,2024-01-15,Widget C,3,39.99,completed,102,Regular customer
+103,2024-01-17,Widget A,1,19.99,completed,103,New customer
+103,2024-01-17,Widget A,1,19.99,completed,103,New customer
+104,2024-01-18,Widget D,2,49.99,shipped,104,Priority shipping
