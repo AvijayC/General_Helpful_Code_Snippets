@@ -1,0 +1,4 @@
+url,output_file,pattern
+https://example.com,example_output.csv,"(.{0,25})(variable_\d+_value)(.{0,25})"
+https://github.com,github_links.csv,"<a[^>]*href=['\"]([^'\"]+)['\"][^>]*>"
+https://stackoverflow.com,stack_code.csv,"<code>([^<]+)</code>"

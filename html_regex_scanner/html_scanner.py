@@ -67,6 +67,8 @@ def main():
     parser.add_argument('url', help='HTML URL to scan')
     parser.add_argument('output', help='CSV output filename')
     parser.add_argument('pattern', help='Regex pattern to search for')
+    parser.add_argument('--distinct', action='store_true', 
+                       help='Return only unique/distinct rows based on capturing groups')
     
     args = parser.parse_args()
     
@@ -79,6 +81,14 @@ def main():
     print(f"Found {len(matches)} matches")
     
     df = create_dataframe(matches, args.output, args.pattern)
+    
+    if args.distinct:
+        # Drop duplicates based on capturing group columns only (not csv_output_name or regex_pattern)
+        capturing_cols = ['capturing_group_1', 'capturing_group_2', 
+                         'capturing_group_3', 'capturing_group_4', 
+                         'capturing_group_5']
+        df = df.drop_duplicates(subset=capturing_cols)
+        print(f"After removing duplicates: {len(df)} unique matches")
     
     df.to_csv(args.output, index=False)
     print(f"Results saved to: {args.output}")

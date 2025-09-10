@@ -113,6 +113,8 @@ def main():
     parser.add_argument('pattern', help='Regex pattern to search for (supports named groups)')
     parser.add_argument('--show-pattern', action='store_true', 
                        help='Display the pattern analysis before scanning')
+    parser.add_argument('--distinct', action='store_true',
+                       help='Return only unique/distinct rows based on capturing groups')
     
     args = parser.parse_args()
     
@@ -143,6 +145,12 @@ def main():
         print(f"Using {len(group_names)} capturing groups")
     
     df = create_dataframe(matches, group_names, has_named_groups, args.output, args.pattern)
+    
+    if args.distinct:
+        # Drop duplicates based on capturing group columns only (not csv_output_name or regex_pattern)
+        capturing_cols = [col for col in df.columns if col not in ['csv_output_name', 'regex_pattern']]
+        df = df.drop_duplicates(subset=capturing_cols)
+        print(f"After removing duplicates: {len(df)} unique matches")
     
     df.to_csv(args.output, index=False)
     print(f"\nResults saved to: {args.output}")
