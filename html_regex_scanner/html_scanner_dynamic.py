@@ -6,6 +6,7 @@ import sys
 import pandas as pd
 import requests
 from typing import List, Dict, Union, Any
+from urllib.parse import urlparse
 
 def fetch_html_content(url: str) -> str:
     """Fetch HTML content from the given URL."""
@@ -59,6 +60,20 @@ def scan_with_regex(html_content: str, pattern: str) -> tuple[List[Any], List[st
         print(f"Invalid regex pattern: {e}", file=sys.stderr)
         sys.exit(1)
 
+def url_to_filename(url: str) -> str:
+    """Convert URL to a safe filename by replacing special characters."""
+    parsed = urlparse(url)
+    # Combine domain and path
+    filename = parsed.netloc + parsed.path
+    # Replace special characters with underscores
+    filename = re.sub(r'[^\w\-_\.]', '_', filename)
+    # Remove consecutive underscores and trim
+    filename = re.sub(r'_+', '_', filename).strip('_')
+    # Add .csv extension if not present
+    if not filename.endswith('.csv'):
+        filename += '.csv'
+    return filename
+
 def create_dataframe(matches: List[Union[Dict, tuple]], 
                     group_names: List[str], 
                     has_named_groups: bool,
@@ -109,12 +124,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument('url', help='HTML URL to scan')
-    parser.add_argument('output', help='CSV output filename')
+    parser.add_argument('output', nargs='?', help='CSV output filename (optional if using --url-as-filename)')
     parser.add_argument('pattern', help='Regex pattern to search for (supports named groups)')
     parser.add_argument('--show-pattern', action='store_true', 
                        help='Display the pattern analysis before scanning')
     parser.add_argument('--distinct', action='store_true',
                        help='Return only unique/distinct rows based on capturing groups')
+    parser.add_argument('--url-as-filename', action='store_true',
+                       help='Use sanitized URL as the output filename')
     
     args = parser.parse_args()
     
@@ -131,6 +148,16 @@ def main():
             sys.exit(1)
         print()
     
+    # Determine output filename
+    if args.url_as_filename:
+        output_file = url_to_filename(args.url)
+        print(f"Using URL-based filename: {output_file}")
+    elif args.output:
+        output_file = args.output
+    else:
+        print("Error: Either provide output filename or use --url-as-filename flag", file=sys.stderr)
+        sys.exit(1)
+    
     print(f"Fetching HTML from: {args.url}")
     html_content = fetch_html_content(args.url)
     
@@ -144,7 +171,7 @@ def main():
     else:
         print(f"Using {len(group_names)} capturing groups")
     
-    df = create_dataframe(matches, group_names, has_named_groups, args.output, args.pattern)
+    df = create_dataframe(matches, group_names, has_named_groups, output_file, args.pattern)
     
     if args.distinct:
         # Drop duplicates based on capturing group columns only (not csv_output_name or regex_pattern)
@@ -152,8 +179,8 @@ def main():
         df = df.drop_duplicates(subset=capturing_cols)
         print(f"After removing duplicates: {len(df)} unique matches")
     
-    df.to_csv(args.output, index=False)
-    print(f"\nResults saved to: {args.output}")
+    df.to_csv(output_file, index=False)
+    print(f"\nResults saved to: {output_file}")
     
     print(f"\nColumns in output: {list(df.columns)}")
     
