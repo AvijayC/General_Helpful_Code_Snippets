@@ -3,19 +3,36 @@
 import argparse
 import re
 import sys
+import os
 import pandas as pd
 import requests
 from typing import List, Dict, Union, Any
 from urllib.parse import urlparse
+from pathlib import Path
 
-def fetch_html_content(url: str) -> str:
-    """Fetch HTML content from the given URL."""
-    try:
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-        return response.text
-    except requests.RequestException as e:
-        print(f"Error fetching URL {url}: {e}", file=sys.stderr)
+def fetch_content(source: str) -> str:
+    """Fetch content from URL or local file."""
+    # Check if source is a file path
+    if os.path.exists(source):
+        print(f"Reading from file: {source}")
+        try:
+            with open(source, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            print(f"Error reading file {source}: {e}", file=sys.stderr)
+            sys.exit(1)
+    # Otherwise treat as URL
+    elif source.startswith(('http://', 'https://')):
+        print(f"Fetching from URL: {source}")
+        try:
+            response = requests.get(source, timeout=30)
+            response.raise_for_status()
+            return response.text
+        except requests.RequestException as e:
+            print(f"Error fetching URL {source}: {e}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        print(f"Error: '{source}' is neither a valid file path nor a URL", file=sys.stderr)
         sys.exit(1)
 
 def scan_with_regex(html_content: str, pattern: str) -> tuple[List[Any], List[str], bool]:
@@ -60,13 +77,18 @@ def scan_with_regex(html_content: str, pattern: str) -> tuple[List[Any], List[st
         print(f"Invalid regex pattern: {e}", file=sys.stderr)
         sys.exit(1)
 
-def url_to_filename(url: str) -> str:
-    """Convert URL to a safe filename by replacing special characters."""
-    parsed = urlparse(url)
-    # Combine domain and path
-    filename = parsed.netloc + parsed.path
-    # Replace special characters with underscores
-    filename = re.sub(r'[^\w\-_\.]', '_', filename)
+def source_to_filename(source: str) -> str:
+    """Convert URL or file path to a safe filename by replacing special characters."""
+    if os.path.exists(source):
+        # For file paths, use the base filename
+        base_name = Path(source).stem
+        filename = re.sub(r'[^\w\-_\.]', '_', base_name)
+    else:
+        # For URLs, use domain and path
+        parsed = urlparse(source)
+        filename = parsed.netloc + parsed.path
+        filename = re.sub(r'[^\w\-_\.]', '_', filename)
+    
     # Remove consecutive underscores and trim
     filename = re.sub(r'_+', '_', filename).strip('_')
     # Add .csv extension if not present
@@ -112,26 +134,26 @@ def create_dataframe(matches: List[Union[Dict, tuple]],
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Scan HTML content with regex patterns (supports named groups)',
+        description='Scan HTML/text content with regex patterns from URL or file (supports named groups)',
         epilog='''
         Examples:
-          # With named groups:
+          # With named groups from URL:
           python html_scanner_dynamic.py "https://example.com" "output.csv" "(?P<before>.{0,25})(?P<variable>variable_(?P<digit>\d)_value)(?P<after>.{0,25})"
           
-          # With numbered groups:
-          python html_scanner_dynamic.py "https://example.com" "output.csv" "(.{0,25})(variable_\d_value)(.{0,25})"
+          # From local file:
+          python html_scanner_dynamic.py "/path/to/file.html" "output.csv" "(.{0,25})(variable_\d_value)(.{0,25})"
         ''',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument('url', help='HTML URL to scan')
-    parser.add_argument('output', nargs='?', help='CSV output filename (optional if using --url-as-filename)')
+    parser.add_argument('source', help='URL or file path to scan')
+    parser.add_argument('output', nargs='?', help='CSV output filename (optional if using --source-as-filename)')
     parser.add_argument('pattern', help='Regex pattern to search for (supports named groups)')
     parser.add_argument('--show-pattern', action='store_true', 
                        help='Display the pattern analysis before scanning')
     parser.add_argument('--distinct', action='store_true',
                        help='Return only unique/distinct rows based on capturing groups')
-    parser.add_argument('--url-as-filename', action='store_true',
-                       help='Use sanitized URL as the output filename')
+    parser.add_argument('--source-as-filename', '--url-as-filename', action='store_true',
+                       help='Use sanitized source name as the output filename')
     
     args = parser.parse_args()
     
@@ -149,20 +171,19 @@ def main():
         print()
     
     # Determine output filename
-    if args.url_as_filename:
-        output_file = url_to_filename(args.url)
-        print(f"Using URL-based filename: {output_file}")
+    if args.source_as_filename:
+        output_file = source_to_filename(args.source)
+        print(f"Using source-based filename: {output_file}")
     elif args.output:
         output_file = args.output
     else:
-        print("Error: Either provide output filename or use --url-as-filename flag", file=sys.stderr)
+        print("Error: Either provide output filename or use --source-as-filename flag", file=sys.stderr)
         sys.exit(1)
     
-    print(f"Fetching HTML from: {args.url}")
-    html_content = fetch_html_content(args.url)
+    content = fetch_content(args.source)
     
     print(f"Scanning with pattern: {args.pattern}")
-    matches, group_names, has_named_groups = scan_with_regex(html_content, args.pattern)
+    matches, group_names, has_named_groups = scan_with_regex(content, args.pattern)
     
     print(f"Found {len(matches)} matches")
     

@@ -1,0 +1,3 @@
+csv_output_name,regex_pattern,before,template,after
+test_file.csv,"(?P<before>.{0,10})(?P<template>\{\{(?!.*\b(?:if|end)\b)[^}]*\}\})(?P<after>.{0,10})",    <div>,{{user_name}},</div>
+test_file.csv,"(?P<before>.{0,10})(?P<template>\{\{(?!.*\b(?:if|end)\b)[^}]*\}\})(?P<after>.{0,10})",    <div>,{{account_id}},</div>
